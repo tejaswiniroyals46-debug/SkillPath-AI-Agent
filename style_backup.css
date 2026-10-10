@@ -1,0 +1,554 @@
+
+/* ==========================================================
+   SKILLPATH AI — AURORA GRADIENT THEME
+   Streamlit | Login | Signup | Dashboard | Code Lab
+   CSS only — preserve app.py and skillpath.db
+   ========================================================== */
+
+:root {
+    --sp-bg: #F4F8F8;
+    --sp-surface: #FFFFFF;
+    --sp-surface-soft: #ECFDF8;
+    --sp-text: #172033;
+    --sp-text-secondary: #475569;
+    --sp-muted: #64748B;
+    --sp-border: #D5E3E5;
+    --sp-primary: #0F766E;
+    --sp-primary-hover: #115E59;
+    --sp-purple: #7C3AED;
+    --sp-cyan: #0891B2;
+    --sp-focus: #0EA5E9;
+    --sp-sidebar: #F0F5FF;
+    --sp-shadow: 0 5px 20px rgba(30, 64, 100, 0.08);
+}
+
+/* ---------- MAIN APPLICATION ---------- */
+
+.stApp {
+    background:
+        radial-gradient(
+            ellipse at 5% 0%,
+            rgba(167, 243, 208, 0.25),
+            transparent 38%
+        ),
+        radial-gradient(
+            ellipse at 95% 5%,
+            rgba(196, 181, 253, 0.20),
+            transparent 35%
+        ),
+        var(--sp-bg) !important;
+
+    color: var(--sp-text) !important;
+}
+
+[data-testid="stAppViewContainer"] {
+    background: transparent !important;
+}
+
+[data-testid="stHeader"] {
+    background: rgba(244, 248, 248, 0.96) !important;
+}
+
+[data-testid="stMain"] {
+    color: var(--sp-text) !important;
+}
+
+[data-testid="stMainBlockContainer"] {
+    padding-top: 1.8rem;
+    padding-bottom: 3rem;
+}
+
+/* ---------- GLOBAL TEXT VISIBILITY ---------- */
+
+.stApp,
+.stApp p,
+.stApp span,
+.stApp label,
+.stApp li,
+.stApp small,
+.stApp div {
+    color: inherit;
+}
+
+.stApp p,
+.stApp li,
+.stApp label,
+.stApp [data-testid="stMarkdownContainer"] {
+    color: var(--sp-text) !important;
+}
+
+.stApp h1,
+.stApp h2,
+.stApp h3,
+.stApp h4,
+.stApp h5 {
+    color: #172554 !important;
+    font-weight: 750 !important;
+    letter-spacing: -0.025em;
+}
+
+.stApp a {
+    color: #0E7490 !important;
+    font-weight: 600;
+}
+
+.stApp a:hover {
+    color: var(--sp-purple) !important;
+}
+
+/* ---------- SIDEBAR ---------- */
+
+[data-testid="stSidebar"] {
+    background:
+        linear-gradient(
+            160deg,
+            #F0FDFA 0%,
+            #F5F3FF 55%,
+            #EFF6FF 100%
+        ) !important;
+
+    border-right: 1px solid #D8E4ED !important;
+}
+
+[data-testid="stSidebar"] > div:first-child {
+    background: transparent !important;
+}
+
+[data-testid="stSidebar"] * {
+    color: #1E293B;
+}
+
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+    color: #334155 !important;
+}
+
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: #312E81 !important;
+}
+
+/* Sidebar navigation items */
+
+[data-testid="stSidebar"] [role="radiogroup"] label {
+    background: rgba(255, 255, 255, 0.72) !important;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin: 3px 0;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+[data-testid="stSidebar"] [role="radiogroup"] label:hover {
+    background: #E0F2FE !important;
+    border-color: #BAE6FD !important;
+}
+
+[data-testid="stSidebar"] [role="radiogroup"] label p {
+    color: #1E293B !important;
+    font-weight: 550;
+}
+
+/* ---------- TOP-LEFT SIDEBAR TOGGLE + HEADER ICONS ---------- */
+
+/* Streamlit versions use different toolbar selectors. */
+
+[data-testid="stHeader"] button,
+[data-testid="stToolbar"] button,
+[data-testid="stSidebarCollapsedControl"] button,
+button[data-testid="collapsedControl"] {
+    color: #243047 !important;
+    background: #FFFFFF !important;
+    border: 1px solid #D5E3E5 !important;
+    border-radius: 10px !important;
+    opacity: 1 !important;
+    box-shadow: 0 2px 8px rgba(30, 64, 100, 0.08);
+}
+
+[data-testid="stHeader"] button svg,
+[data-testid="stToolbar"] button svg,
+[data-testid="stSidebarCollapsedControl"] button svg,
+button[data-testid="collapsedControl"] svg {
+    color: #243047 !important;
+    fill: currentColor;
+    stroke: currentColor;
+    opacity: 1 !important;
+}
+
+[data-testid="stHeader"] button:hover,
+[data-testid="stToolbar"] button:hover,
+[data-testid="stSidebarCollapsedControl"] button:hover,
+button[data-testid="collapsedControl"]:hover {
+    background: #DDFBF2 !important;
+    border-color: #5EEAD4 !important;
+}
+
+/* ---------- INPUTS: EMAIL, PASSWORD, TEXT ---------- */
+
+/* Keep input fields white with DARK text even on focus. */
+
+.stApp input,
+.stApp textarea,
+.stApp [data-baseweb="input"] input,
+.stApp [data-baseweb="textarea"] textarea {
+    background-color: #FFFFFF !important;
+    color: #172033 !important;
+    -webkit-text-fill-color: #172033 !important;
+    caret-color: #0F766E !important;
+    border-color: #B8CDD2 !important;
+    opacity: 1 !important;
+}
+
+.stApp input::placeholder,
+.stApp textarea::placeholder {
+    color: #64748B !important;
+    -webkit-text-fill-color: #64748B !important;
+    opacity: 1 !important;
+}
+
+/* Normal, hover, focus and autofill states */
+
+.stApp [data-baseweb="input"],
+.stApp [data-baseweb="textarea"] {
+    background: #FFFFFF !important;
+    border-color: #B8CDD2 !important;
+    border-radius: 10px !important;
+}
+
+.stApp [data-baseweb="input"]:hover,
+.stApp [data-baseweb="textarea"]:hover {
+    border-color: #5EEAD4 !important;
+}
+
+.stApp [data-baseweb="input"]:focus-within,
+.stApp [data-baseweb="textarea"]:focus-within {
+    border-color: #0F766E !important;
+    box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.18) !important;
+}
+
+.stApp input:-webkit-autofill,
+.stApp input:-webkit-autofill:hover,
+.stApp input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #172033 !important;
+    box-shadow: 0 0 0 1000px #FFFFFF inset !important;
+    transition: background-color 9999s ease-in-out 0s;
+}
+
+/* ---------- DROPDOWNS / SELECT BOXES ---------- */
+
+.stApp [data-baseweb="select"] > div,
+.stApp [data-baseweb="popover"],
+.stApp [data-baseweb="menu"],
+.stApp [role="listbox"] {
+    background-color: #FFFFFF !important;
+    color: #172033 !important;
+    border-color: #D5E3E5 !important;
+}
+
+.stApp [data-baseweb="select"] *,
+.stApp [role="option"] {
+    color: #172033 !important;
+}
+
+.stApp [role="option"]:hover {
+    background: #DDFBF2 !important;
+}
+
+.stApp [aria-selected="true"] {
+    background-color: #CCFBF1 !important;
+    color: #115E59 !important;
+}
+
+/* ---------- BUTTONS ---------- */
+
+.stApp .stButton > button,
+.stApp .stFormSubmitButton > button,
+.stApp button[kind="primary"] {
+    background: linear-gradient(
+        110deg,
+        #0F766E,
+        #0E7490
+    ) !important;
+
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    border: 1px solid #0F766E !important;
+    border-radius: 10px !important;
+    font-weight: 650 !important;
+    min-height: 42px;
+    box-shadow: 0 3px 10px rgba(15, 118, 110, 0.16);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.stApp .stButton > button *,
+.stApp .stFormSubmitButton > button *,
+.stApp button[kind="primary"] * {
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+}
+
+.stApp .stButton > button:hover,
+.stApp .stFormSubmitButton > button:hover,
+.stApp button[kind="primary"]:hover {
+    background: linear-gradient(
+        110deg,
+        #115E59,
+        #155E75
+    ) !important;
+    border-color: #0F766E !important;
+    box-shadow: 0 5px 16px rgba(15, 118, 110, 0.22);
+    transform: translateY(-1px);
+}
+
+.stApp .stButton > button:disabled,
+.stApp .stFormSubmitButton > button:disabled {
+    background: #CBD5E1 !important;
+    color: #475569 !important;
+    -webkit-text-fill-color: #475569 !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+}
+
+/* ---------- SECONDARY BUTTONS ---------- */
+
+.stApp button[kind="secondary"] {
+    background: #FFFFFF !important;
+    color: #334155 !important;
+    -webkit-text-fill-color: #334155 !important;
+    border: 1px solid #CBD5E1 !important;
+}
+
+.stApp button[kind="secondary"] * {
+    color: #334155 !important;
+    -webkit-text-fill-color: #334155 !important;
+}
+
+/* ---------- FORMS AND LOGIN / SIGNUP CARDS ---------- */
+
+.stApp [data-testid="stForm"] {
+    background: rgba(255, 255, 255, 0.94) !important;
+    border: 1px solid #D5E3E5 !important;
+    border-radius: 16px !important;
+    padding: 22px !important;
+    box-shadow: var(--sp-shadow);
+}
+
+.stApp [data-testid="stForm"] label {
+    color: #334155 !important;
+    font-weight: 600;
+}
+
+/* ---------- METRICS / DASHBOARD CARDS ---------- */
+
+.stApp [data-testid="stMetric"] {
+    background: rgba(255, 255, 255, 0.96) !important;
+    border: 1px solid #D5E3E5 !important;
+    border-radius: 15px !important;
+    padding: 18px !important;
+    box-shadow: var(--sp-shadow);
+}
+
+.stApp [data-testid="stMetricLabel"],
+.stApp [data-testid="stMetricLabel"] * {
+    color: #475569 !important;
+}
+
+.stApp [data-testid="stMetricValue"],
+.stApp [data-testid="stMetricValue"] * {
+    color: #0F766E !important;
+    font-weight: 750 !important;
+}
+
+.stApp [data-testid="stMetricDelta"] {
+    color: #047857 !important;
+}
+
+/* ---------- CONTAINERS / EXPANDERS ---------- */
+
+.stApp [data-testid="stExpander"] {
+    background: rgba(255, 255, 255, 0.88) !important;
+    border: 1px solid #D5E3E5 !important;
+    border-radius: 12px !important;
+}
+
+.stApp [data-testid="stExpander"] summary,
+.stApp [data-testid="stExpander"] summary span {
+    color: #243047 !important;
+}
+
+.stApp [data-testid="stVerticalBlockBorderWrapper"] {
+    border-color: #D5E3E5 !important;
+    border-radius: 14px !important;
+}
+
+/* ---------- ALERTS / STATUS MESSAGES ---------- */
+
+.stApp [data-testid="stAlert"] {
+    border-radius: 12px !important;
+    border: 1px solid #CFE5E5 !important;
+}
+
+.stApp [data-testid="stAlert"] p,
+.stApp [data-testid="stAlert"] span {
+    color: #243047 !important;
+}
+
+/* ---------- PROGRESS BARS ---------- */
+
+.stApp [data-testid="stProgressBar"] > div {
+    background: #DCE8E8 !important;
+    border-radius: 20px !important;
+}
+
+.stApp [data-testid="stProgressBar"] > div > div {
+    background: linear-gradient(
+        90deg,
+        #0F766E,
+        #14B8A6,
+        #8B5CF6
+    ) !important;
+    border-radius: 20px !important;
+}
+
+/* ---------- TABLES / DATAFRAMES ---------- */
+
+.stApp [data-testid="stTable"],
+.stApp [data-testid="stDataFrame"] {
+    border: 1px solid #D5E3E5 !important;
+    border-radius: 10px !important;
+    overflow: hidden;
+}
+
+.stApp table {
+    background: #FFFFFF !important;
+    color: #172033 !important;
+}
+
+.stApp th {
+    background: #E6FFFA !important;
+    color: #134E4A !important;
+}
+
+.stApp td {
+    color: #243047 !important;
+}
+
+/* ---------- CODE LAB / CODE BLOCKS ---------- */
+
+.stApp pre,
+.stApp [data-testid="stCode"],
+.stApp code {
+    border-radius: 10px !important;
+}
+
+.stApp pre {
+    border: 1px solid #D5E3E5 !important;
+}
+
+/* Do not recolour embedded third-party editor iframes.
+   Editors can have their own independent theme settings. */
+
+.stApp iframe {
+    max-width: 100%;
+}
+
+/* ---------- RADIO / CHECKBOX / SLIDER ---------- */
+
+.stApp [data-testid="stCheckbox"] label,
+.stApp [data-testid="stRadio"] label {
+    color: #243047 !important;
+}
+
+.stApp [data-testid="stCheckbox"] label p,
+.stApp [data-testid="stRadio"] label p {
+    color: #243047 !important;
+}
+
+.stApp [data-baseweb="slider"] [role="slider"] {
+    background: #0F766E !important;
+    border-color: #0F766E !important;
+}
+
+/* ---------- TABS ---------- */
+
+.stApp button[data-baseweb="tab"] {
+    color: #475569 !important;
+    background: transparent !important;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+.stApp button[data-baseweb="tab"] p {
+    color: inherit !important;
+}
+
+.stApp button[data-baseweb="tab"][aria-selected="true"] {
+    color: #0F766E !important;
+    border-bottom-color: #0F766E !important;
+    font-weight: 700 !important;
+}
+
+/* ---------- FILE UPLOADER ---------- */
+
+.stApp [data-testid="stFileUploader"] section {
+    background: #FFFFFF !important;
+    border: 1px dashed #9DBFC2 !important;
+    border-radius: 12px !important;
+}
+
+.stApp [data-testid="stFileUploader"] section,
+.stApp [data-testid="stFileUploader"] section * {
+    color: #334155 !important;
+}
+
+/* ---------- TOOLTIPS / POPOVERS ---------- */
+
+[data-baseweb="tooltip"],
+[data-baseweb="popover"] {
+    color: #172033 !important;
+}
+
+/* ---------- FOCUS VISIBILITY ---------- */
+
+.stApp button:focus-visible,
+.stApp input:focus-visible,
+.stApp textarea:focus-visible,
+.stApp a:focus-visible {
+    outline: 3px solid #38BDF8 !important;
+    outline-offset: 2px !important;
+}
+
+/* ---------- SCROLLBAR ---------- */
+
+::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+}
+
+::-webkit-scrollbar-track {
+    background: #EDF4F4;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #A7C6C8;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #5FA6A5;
+}
+
+/* ---------- RESPONSIVE LAYOUT ---------- */
+
+@media (max-width: 768px) {
+    [data-testid="stMainBlockContainer"] {
+        padding: 1rem 0.8rem 2rem;
+    }
+
+    .stApp [data-testid="stMetric"] {
+        padding: 12px !important;
+    }
+
+    .stApp [data-testid="stForm"] {
+        padding: 14px !important;
+    }
+}
