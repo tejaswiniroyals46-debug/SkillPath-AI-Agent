@@ -4570,7 +4570,6 @@ elif page == "SkillForge Code Lab":
     # Embedded online coding editor.
     # The editor runs on the external provider's website.
     editor_url = "https://onecompiler.com/embed/?theme=dark"
-    )
 
     
     st.iframe(
