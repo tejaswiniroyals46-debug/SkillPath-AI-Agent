@@ -4569,9 +4569,7 @@ elif page == "SkillForge Code Lab":
 
     # Embedded online coding editor.
     # The editor runs on the external provider's website.
-    editor_url = (
-        "https://codecompiler.forgesparse.com/python"
-        "?embed=1&theme=dark"
+    editor_url = "https://onecompiler.com/embed/?theme=dark"
     )
 
     
