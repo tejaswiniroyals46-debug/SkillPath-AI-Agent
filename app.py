@@ -1,5 +1,6 @@
 import streamlit as st
 import database
+import career_agent
 import json
 import random
 import os
@@ -7,8 +8,9 @@ import requests
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
 from google import genai
+from pathlib import Path
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 st.set_page_config(
     page_title="SkillPath AI",
@@ -18,7 +20,6 @@ st.set_page_config(
 )
 
 # Load the external SkillPath AI theme.
-from pathlib import Path
 
 css_path = Path(__file__).parent / "style.css"
 
@@ -30,6 +31,70 @@ if css_path.exists():
         f"<style>{css_content}</style>",
         unsafe_allow_html=True
     )
+
+
+def generate_skillpath_ai_answer(prompt, system_prompt=None, max_tokens=700):
+    """Try configured AI providers in order and return (answer, diagnostics)."""
+    diagnostics = []
+    gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+
+    if gemini_api_key:
+        try:
+            client = genai.Client(api_key=gemini_api_key)
+            response = client.models.generate_content(
+                model="gemini-3.1-flash-lite",
+                contents=(f"{system_prompt}\n\n{prompt}" if system_prompt else prompt),
+                config={"temperature": 0.35, "max_output_tokens": max_tokens},
+            )
+            text = (getattr(response, "text", None) or "").strip()
+            if text:
+                return text, diagnostics
+            diagnostics.append("Gemini returned an empty answer.")
+        except Exception as exc:
+            diagnostics.append(f"Gemini: {str(exc)[:220]}")
+    else:
+        diagnostics.append("GEMINI_API_KEY is not configured.")
+
+    if openrouter_api_key:
+        headers = {
+            "Authorization": f"Bearer {openrouter_api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://skillpath-ai-bok2.onrender.com",
+            "X-Title": "SkillPath AI",
+        }
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        # Try a short list because free model availability can change.
+        for model_name in (
+            "google/gemma-4-26b-a4b-it:free",
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        ):
+            try:
+                response = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers,
+                    json={"model": model_name, "messages": messages,
+                          "temperature": 0.35, "max_tokens": max_tokens},
+                    timeout=35,
+                )
+                if not response.ok:
+                    diagnostics.append(f"OpenRouter {model_name}: HTTP {response.status_code}")
+                    continue
+                choices = response.json().get("choices", [])
+                content = choices[0].get("message", {}).get("content") if choices else None
+                if isinstance(content, str) and content.strip():
+                    return content.strip(), diagnostics
+                diagnostics.append(f"OpenRouter {model_name}: empty answer.")
+            except Exception as exc:
+                diagnostics.append(f"OpenRouter {model_name}: {str(exc)[:180]}")
+    else:
+        diagnostics.append("OPENROUTER_API_KEY is not configured.")
+
+    return None, diagnostics
+
 
 database.init_db()
 
@@ -436,43 +501,60 @@ if current_profile is None:
 
 
 # =========================================================
-# MAIN APP HEADER AND SIDEBAR
+# MAIN APP HEADER AND TOP NAVIGATION
 # =========================================================
 
 st.title("🎯 SkillPath AI")
 st.subheader("Your Career. Your Skills. Your Future.")
+st.write("An AI-powered career, learning and placement-readiness platform for engineering students.")
 
-st.write(
-    "An AI-powered career, learning and placement-readiness "
-    "platform for engineering students."
-)
+PAGES = [
+    ("AI Career Agent", "🧭"),
+    ("Dashboard", "🏠"),
+    ("My Profile", "👤"),
+    ("Career Goals", "🎯"),
+    ("Skill Assessment", "🧠"),
+    ("Learning Hub", "📚"),
+    ("Jobs & Internships", "💼"),
+    ("AI Resume Analyzer", "📄"),
+    ("AI Mock Interview", "🎤"),
+    ("SkillForge Code Lab", "💻"),
+    ("SkillForge XP & Achievements", "🏆"),
+    ("AI Career Mentor", "🤖"),
+    ("My Progress", "📈"),
+]
+if "active_page" not in st.session_state:
+    st.session_state.active_page = "Dashboard"
 
+st.markdown("""<style>
+.skillpath-nav-label {font-size:0.78rem; font-weight:600; text-align:center;}
+div[data-testid="stHorizontalBlock"] button {min-height: 3rem; white-space: normal; line-height: 1.15;}
+</style>""", unsafe_allow_html=True)
+
+# Two compact rows keep icon + page name visible without placing navigation in the sidebar.
+for row_start in (0, 7):
+    nav_items = PAGES[row_start:row_start + 7]
+    nav_cols = st.columns(7, gap="small")
+    for col, (page_name, page_icon) in zip(nav_cols, nav_items):
+        with col:
+            if st.button(
+                f"{page_icon}\n{page_name}",
+                key=f"topnav_{page_name}",
+                type="primary" if st.session_state.active_page == page_name else "secondary",
+                use_container_width=True,
+            ):
+                st.session_state.active_page = page_name
+                st.rerun()
+
+page = st.session_state.active_page
 with st.sidebar:
     st.title("SkillPath AI")
     st.caption("by SkillForge")
-
-    page = st.radio(
-        "Navigation",
-        [
-            "Dashboard",
-            "My Profile",
-            "Career Goals",
-            "Skill Assessment",
-            "Learning Hub",
-            "Jobs & Internships",
-            "AI Resume Analyzer",
-            "AI Mock Interview",
-            "SkillForge Code Lab",
-            "SkillForge XP & Achievements",
-            "AI Career Mentor",
-            "My Progress"
-        ]
-    )
-
+    st.caption(f"Current page: {page}")
     st.divider()
-
     if st.button("Log out", use_container_width=True):
         st.session_state.user_id = None
+        st.session_state.active_page = "Dashboard"
         st.rerun()
 
 st.divider()
@@ -924,6 +1006,77 @@ elif page == "Learning Hub":
         "Learn your chosen career path with course notes, "
         "programming examples, practice exercises and downloadable PDFs."
     )
+
+    # ---------------------------------------------------------
+    # FREE / OPEN TEXTBOOKS AND OFFICIAL COURSE RESOURCES
+    # ---------------------------------------------------------
+    resource_catalog = {
+        "Software Developer": [
+            ("Python programming", "Think Python 2e (free PDF)", "Beginner-friendly Python textbook.", "https://greenteapress.com/thinkpython2/thinkpython2.pdf", True),
+            ("Git and GitHub", "Pro Git (free online book/PDF)", "Version control, branches, merging and collaboration.", "https://git-scm.com/book/en/v2", False),
+            ("Java programming", "Official Java Tutorials", "Classes, objects, collections, exceptions and APIs.", "https://docs.oracle.com/javase/tutorial/", False),
+            ("Algorithms and data structures", "OpenDSA interactive textbooks", "Data structures, algorithms and practice activities.", "https://opendsa-server.cs.vt.edu/", False),
+        ],
+        "Web Developer": [
+            ("JavaScript", "Eloquent JavaScript (free book/PDF)", "JavaScript fundamentals, browser programming and Node.js.", "https://eloquentjavascript.net/", False),
+            ("HTML, CSS and accessibility", "MDN Web Docs", "Reliable reference for HTML, CSS, JavaScript and accessibility.", "https://developer.mozilla.org/en-US/docs/Learn", False),
+            ("Git and deployment", "Pro Git (free online book/PDF)", "Learn commits, branches and team workflows.", "https://git-scm.com/book/en/v2", False),
+        ],
+        "Data Scientist": [
+            ("Statistics", "Think Stats 2e (free PDF)", "Practical statistics using Python examples.", "https://greenteapress.com/thinkstats2/thinkstats2.pdf", True),
+            ("Bayesian statistics", "Think Bayes 2e (free PDF)", "Bayesian methods and probability using Python.", "https://greenteapress.com/thinkbayes2/thinkbayes2.pdf", True),
+            ("Data analysis", "Pandas official user guide", "DataFrames, cleaning, joins, grouping and missing values.", "https://pandas.pydata.org/docs/user_guide/", False),
+            ("Machine learning", "Scikit-learn user guide", "Model selection, preprocessing, metrics and estimators.", "https://scikit-learn.org/stable/user_guide.html", False),
+        ],
+        "Data Analyst": [
+            ("Statistics", "Think Stats 2e (free PDF)", "Statistics with examples and exercises.", "https://greenteapress.com/thinkstats2/thinkstats2.pdf", True),
+            ("Python data analysis", "Pandas official user guide", "Import, clean, transform and summarize datasets.", "https://pandas.pydata.org/docs/user_guide/", False),
+            ("SQL", "SQLBolt interactive lessons", "Practice SELECT, JOIN, GROUP BY and subqueries.", "https://sqlbolt.com/", False),
+            ("Data visualization", "Plotly Python documentation", "Charts, dashboards and interactive visualizations.", "https://plotly.com/python/", False),
+        ],
+        "Machine Learning Engineer": [
+            ("Deep learning", "Dive into Deep Learning (free online textbook/PDF)", "Neural networks with code and explanations.", "https://d2l.ai/", False),
+            ("Machine learning", "Scikit-learn user guide", "Classical ML, preprocessing and evaluation.", "https://scikit-learn.org/stable/user_guide.html", False),
+            ("Python", "Think Python 2e (free PDF)", "Build a strong programming foundation.", "https://greenteapress.com/thinkpython2/thinkpython2.pdf", True),
+        ],
+        "Cybersecurity Analyst": [
+            ("Web application security", "OWASP Web Security Testing Guide", "A structured guide for defensive web security testing.", "https://owasp.org/www-project-web-security-testing-guide/", False),
+            ("Secure coding", "OWASP Cheat Sheet Series", "Practical defensive security guidance for developers.", "https://cheatsheetseries.owasp.org/", False),
+            ("Networking", "Cisco Skills for All", "Free networking and cybersecurity learning paths.", "https://skillsforall.com/", False),
+        ],
+        "Cloud / DevOps Engineer": [
+            ("Git", "Pro Git (free online book/PDF)", "Version control and collaboration workflows.", "https://git-scm.com/book/en/v2", False),
+            ("Containers and orchestration", "Kubernetes official tutorials", "Core concepts and hands-on learning.", "https://kubernetes.io/docs/tutorials/", False),
+            ("Linux", "The Linux Documentation Project", "Free Linux guides and manuals.", "https://tldp.org/", False),
+        ],
+        "General / Other": [
+            ("Programming", "Think Python 2e (free PDF)", "A gentle introduction to computational thinking.", "https://greenteapress.com/thinkpython2/thinkpython2.pdf", True),
+            ("Mathematics and statistics", "OpenStax free textbooks", "Free, openly licensed college textbooks; choose a relevant subject.", "https://openstax.org/subjects/math", False),
+            ("Computer science", "MIT OpenCourseWare", "Free course materials from MIT; availability varies by course.", "https://ocw.mit.edu/", False),
+        ],
+    }
+    st.subheader("📖 Free Textbooks & Official Learning Resources")
+    st.caption("Choose your career path to find free/open resources. PDF downloads are offered only where the publisher provides a legitimate free PDF; other links open the official book or course page.")
+    saved_goal_for_books = database.get_career_goal(st.session_state.user_id) or "General / Other"
+    career_options = list(resource_catalog.keys())
+    suggested = saved_goal_for_books if saved_goal_for_books in resource_catalog else "General / Other"
+    selected_book_career = st.selectbox(
+        "Career path / domain", career_options,
+        index=career_options.index(suggested), key="textbook_career_path"
+    )
+    resource_filter = st.text_input("Filter by course or domain (optional)", key="textbook_domain_filter", placeholder="e.g. Python, SQL, statistics, security")
+    visible_resources = resource_catalog[selected_book_career]
+    if resource_filter.strip():
+        visible_resources = [item for item in visible_resources if resource_filter.lower() in (item[0] + " " + item[1] + " " + item[2]).lower()]
+    if not visible_resources:
+        st.info("No exact match in this career list. Clear the filter or select another career path.")
+    for domain, title, description, url, is_pdf in visible_resources:
+        with st.container(border=True):
+            st.markdown(f"**{title}**")
+            st.caption(f"Domain: {domain} · {description}")
+            label = "⬇️ Open free PDF" if is_pdf else "🔗 Open official resource"
+            st.link_button(label, url, use_container_width=False)
+    st.caption("Resources are maintained by their publishers/official projects. Availability and licensing are controlled by those sites; SkillPath AI does not host or redistribute copyrighted textbooks.")
 
     # ---------------------------------------------------------
     # COURSE NOTES
@@ -3982,30 +4135,170 @@ elif page == "AI Resume Analyzer":
                 st.caption(f"Technical details: {error}")
 
 
+
 # =========================================================
 # AI MOCK INTERVIEW - SKILLPATH AI
 # 24 ROLES | 50 QUESTIONS PER ROLE | 10 RANDOM PER INTERVIEW
+# AI EVALUATION + KEYWORD FALLBACK
 # =========================================================
 
 elif page == "AI Mock Interview":
-    import random
+    import os
     import re
+    import json
+    import random
+    import requests
     from datetime import date, timedelta
+
+    from dotenv import load_dotenv
+    load_dotenv()
 
     st.header("🎤 AI Mock Interview")
     st.write(
-        "Practise job interviews with role-specific questions, "
-        "answer evaluation, sample answers and feedback."
+        "Practise role-specific interviews with AI-powered answer "
+        "evaluation, personalized feedback, sample answers and progress tracking."
     )
 
     st.info(
-        "Free practice mode. No API key required. "
-        "Scores measure keyword coverage, not full AI understanding."
+        "AI evaluates correctness, understanding, explanations and practical "
+        "examples. Keyword-based evaluation is used only if AI is unavailable."
     )
 
     # -----------------------------------------------------
+    # AI ANSWER EVALUATION
+    # Reuses existing Gemini or OpenRouter environment keys.
+    # -----------------------------------------------------
+
+    def evaluate_mock_answer_with_ai(question, answer, role, sample):
+        prompt = f"""
+You are a fair technical interview evaluator helping engineering students.
+
+Role: {role}
+Question: {question}
+Student answer: {answer}
+Reference guidance: {sample}
+
+Evaluate the answer based on its meaning and technical accuracy.
+Do not reward keywords alone. Accept technically correct alternative wording.
+Do not invent claims about what the student knows.
+
+Return ONLY a valid JSON object in this format:
+{{
+  "score": 0,
+  "correctness": "Short assessment of technical correctness",
+  "strengths": ["Strength 1"],
+  "missing_concepts": ["Concept to improve"],
+  "improvement": "Specific constructive advice",
+  "sample_answer": "A clear, technically accurate model answer"
+}}
+
+Scoring:
+- Technical correctness: 40%
+- Conceptual understanding: 25%
+- Relevant explanation: 20%
+- Practical application or example: 15%
+
+If an example is not needed for the question, do not penalize its absence.
+Score must be an integer from 0 to 100.
+Keep the feedback clear, specific and appropriate for a student.
+"""
+
+        # Provider 1: Gemini
+        gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+
+        if gemini_key:
+            try:
+                from google import genai
+
+                client = genai.Client(api_key=gemini_key)
+                response = client.models.generate_content(
+                    model=os.getenv(
+                        "GEMINI_MODEL",
+                        "gemini-3.1-flash-lite"
+                    ),
+                    contents=prompt,
+                )
+
+                raw = (response.text or "").strip()
+
+                if raw.startswith("```"):
+                    raw = raw.split("\n", 1)[-1]
+                    raw = raw.rsplit("```", 1)[0].strip()
+
+                result = json.loads(raw)
+
+                if not isinstance(result, dict):
+                    raise ValueError("Invalid AI response")
+
+                score = int(result["score"])
+                result["score"] = max(0, min(100, score))
+                result["mode"] = "AI"
+                return result
+
+            except Exception:
+                pass
+
+        # Provider 2: OpenRouter
+        router_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+
+        if router_key:
+            try:
+                response = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {router_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": os.getenv(
+                            "OPENROUTER_MODEL",
+                            "google/gemma-4-26b-a4b-it:free"
+                        ),
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": (
+                                    "You are a fair interview evaluator. "
+                                    "Return only valid JSON."
+                                ),
+                            },
+                            {
+                                "role": "user",
+                                "content": prompt,
+                            },
+                        ],
+                        "temperature": 0.2,
+                    },
+                    timeout=40,
+                )
+
+                response.raise_for_status()
+                raw = response.json()["choices"][0]["message"]["content"]
+                raw = raw.strip()
+
+                if raw.startswith("```"):
+                    raw = raw.split("\n", 1)[-1]
+                    raw = raw.rsplit("```", 1)[0].strip()
+
+                result = json.loads(raw)
+
+                if not isinstance(result, dict):
+                    raise ValueError("Invalid AI response")
+
+                score = int(result["score"])
+                result["score"] = max(0, min(100, score))
+                result["mode"] = "AI"
+                return result
+
+            except Exception:
+                pass
+
+        # Both providers failed or no key is configured.
+        return None
+
+    # -----------------------------------------------------
     # ROLE-WISE TOPICS
-    # Each role has 10 topics x 5 question styles = 50.
+    # 10 topics x 5 question styles = 50 questions per role.
     # -----------------------------------------------------
 
     role_topics = {
@@ -4158,9 +4451,7 @@ elif page == "AI Mock Interview":
     }
 
     # -----------------------------------------------------
-    # ORIGINAL QUESTIONS - RETAINED
-    # These replace the first five generated questions
-    # for the original four roles.
+    # ORIGINAL QUESTIONS FOR FOUR ROLES
     # -----------------------------------------------------
 
     original_questions = {
@@ -4275,7 +4566,7 @@ elif page == "AI Mock Interview":
     }
 
     # -----------------------------------------------------
-    # BUILD EXACTLY 50 QUESTIONS FOR EVERY ROLE
+    # BUILD 50 QUESTIONS PER ROLE
     # -----------------------------------------------------
 
     question_templates = [
@@ -4291,7 +4582,6 @@ elif page == "AI Mock Interview":
     for role_name, topics in role_topics.items():
         bank = []
 
-        # Create 50 role-topic questions.
         for topic in topics:
             for template in question_templates:
                 question = template.format(topic=topic)
@@ -4307,9 +4597,9 @@ elif page == "AI Mock Interview":
 
                 sample = (
                     f"{topic} is an important area for this role. "
-                    f"I would explain its purpose, describe how it works, "
-                    f"give a practical example, and explain how I would "
-                    f"test the result or solve a related problem."
+                    "I would explain its purpose, describe how it works, "
+                    "give a practical example, and explain how I would "
+                    "test the result or solve a related problem."
                 )
 
                 bank.append({
@@ -4318,7 +4608,6 @@ elif page == "AI Mock Interview":
                     "sample": sample,
                 })
 
-        # Preserve the five original questions in the original four roles.
         if role_name in original_questions:
             for i, (old_q, old_keywords, old_sample) in enumerate(
                 original_questions[role_name]
@@ -4331,7 +4620,6 @@ elif page == "AI Mock Interview":
 
         question_bank[role_name] = bank
 
-    # Verify all roles have exactly 50 questions.
     if not all(len(qs) == 50 for qs in question_bank.values()):
         st.error("Question bank setup error. Please check the code.")
         st.stop()
@@ -4370,8 +4658,7 @@ elif page == "AI Mock Interview":
         st.divider()
 
         if index >= len(questions):
-            
-            # Award mock interview XP only once per completed interview.
+
             completed_interview_id = (
                 f"{st.session_state.get('mock_role_v1', active_role)}_"
                 f"{id(questions)}"
@@ -4411,11 +4698,12 @@ elif page == "AI Mock Interview":
 
                 xp_data["last_claim_date"] = today
                 st.session_state["sf_xp_data_v1"] = xp_data
-                # Permanently save the interview reward.
+
                 database.save_skillforge_xp(
                     st.session_state.user_id,
                     xp_data
                 )
+
                 st.session_state[
                     "sf_awarded_interview_id_v1"
                 ] = completed_interview_id
@@ -4423,23 +4711,30 @@ elif page == "AI Mock Interview":
                 st.success(
                     "🏆 Mock Interview completed! You earned +30 XP!"
                 )
+
             evaluated_scores = list(feedback.values())
             percentage = round(
                 sum(evaluated_scores) / len(evaluated_scores)
             ) if evaluated_scores else 0
 
             st.success("🎉 Interview completed!")
-            st.metric("Average Keyword Match", f"{percentage}%")
+            st.metric("Average Evaluation Score", f"{percentage}%")
             st.write(f"Role: {active_role}")
             st.write(f"Questions in this interview: {len(questions)}")
             st.write(f"Questions evaluated: {len(evaluated_scores)}")
 
             if percentage >= 70:
-                st.success("Good keyword coverage! Keep practising your explanations.")
+                st.success(
+                    "Good performance! Keep practising your explanations."
+                )
             elif percentage >= 40:
-                st.info("Good start. Review the sample answers and practise more.")
+                st.info(
+                    "Good start. Review the feedback and practise more."
+                )
             else:
-                st.warning("Review the concepts and try explaining them in your own words.")
+                st.warning(
+                    "Review the concepts and try explaining them in your own words."
+                )
 
             if st.button("🔄 Try Another Interview", key="mock_retry_v1"):
                 st.session_state["mock_index_v1"] = 0
@@ -4470,55 +4765,120 @@ elif page == "AI Mock Interview":
                 key=f"mock_eval_v3_{index}",
             ):
                 if not answer.strip():
-                    st.warning("Please type an answer before evaluating.")
-                else:
-                    answer_lower = answer.lower()
-
-                    matched = [
-                        word for word in item["keywords"]
-                        if re.search(
-                            r"\b" + re.escape(word.lower()) + r"\b",
-                            answer_lower,
-                        )
-                    ]
-
-                    score = round(
-                        len(matched) / len(item["keywords"]) * 100
-                    ) if item["keywords"] else 0
-
-                    st.session_state["mock_feedback_v1"][index] = score
-
-                    st.markdown("### 📊 Feedback")
-                    st.metric("Keyword Match", f"{score}%")
-                    st.write(
-                        f"Relevant keywords found: {len(matched)} "
-                        f"out of {len(item['keywords'])}"
+                    st.warning(
+                        "Please type an answer before evaluating."
                     )
-
-                    missing = [
-                        word for word in item["keywords"]
-                        if word not in matched
-                    ]
-
-                    if missing:
-                        st.write(
-                            "**Topics you could mention:** "
-                            + ", ".join(missing)
+                else:
+                    with st.spinner(
+                        "AI is evaluating your answer..."
+                    ):
+                        ai_result = evaluate_mock_answer_with_ai(
+                            question=item["q"],
+                            answer=answer.strip(),
+                            role=active_role,
+                            sample=item["sample"],
                         )
 
-                    if score >= 70:
-                        st.success("Good keyword coverage! Explain the concepts clearly.")
-                    elif score >= 40:
-                        st.info("Fair start. Add relevant concepts and examples.")
-                    else:
-                        st.warning("Review the sample answer and try explaining it again.")
+                    if ai_result:
+                        score = ai_result["score"]
+                        st.session_state[
+                            "mock_feedback_v1"
+                        ][index] = score
 
-                    with st.expander("💡 View sample answer"):
-                        st.write(item["sample"])
+                        st.success("AI evaluation completed.")
+                        st.caption(
+                            "Evaluation mode: AI-powered assessment"
+                        )
+                        st.metric("AI Evaluation Score", f"{score}%")
+
+                        st.write("### Technical correctness")
+                        st.write(
+                            ai_result.get(
+                                "correctness",
+                                "No correctness feedback available."
+                            )
+                        )
+
+                        st.write("### What you did well")
+                        strengths = ai_result.get("strengths", [])
+                        if isinstance(strengths, list) and strengths:
+                            for strength in strengths:
+                                st.write(f"• {strength}")
+                        else:
+                            st.write("Continue practising clear explanations.")
+
+                        st.write("### Concepts to improve")
+                        missing = ai_result.get("missing_concepts", [])
+                        if isinstance(missing, list) and missing:
+                            for concept in missing:
+                                st.write(f"• {concept}")
+                        else:
+                            st.write("No major gaps were identified.")
+
+                        st.write("### Personalized feedback")
+                        st.write(
+                            ai_result.get(
+                                "improvement",
+                                "Practise explaining the concept clearly."
+                            )
+                        )
+
+                        with st.expander("💡 AI sample answer"):
+                            st.write(
+                                ai_result.get(
+                                    "sample_answer",
+                                    item["sample"]
+                                )
+                            )
+
+                    else:
+                        # Original keyword evaluation retained as fallback.
+                        answer_lower = answer.lower()
+
+                        matched = [
+                            word for word in item["keywords"]
+                            if re.search(
+                                r"\b" + re.escape(word.lower()) + r"\b",
+                                answer_lower,
+                            )
+                        ]
+
+                        score = round(
+                            len(matched) / len(item["keywords"]) * 100
+                        ) if item["keywords"] else 0
+
+                        st.session_state[
+                            "mock_feedback_v1"
+                        ][index] = score
+
+                        st.warning(
+                            "AI provider unavailable. Showing keyword-based "
+                            "feedback instead. This is not an AI evaluation."
+                        )
+                        st.metric("Keyword Match", f"{score}%")
+
+                        st.write(
+                            f"Relevant keywords found: {len(matched)} "
+                            f"out of {len(item['keywords'])}"
+                        )
+
+                        missing = [
+                            word for word in item["keywords"]
+                            if word not in matched
+                        ]
+
+                        if missing:
+                            st.write(
+                                "**Keywords to review:** "
+                                + ", ".join(missing)
+                            )
+
+                        with st.expander("💡 Reference answer"):
+                            st.write(item["sample"])
 
             if index in feedback:
                 st.caption(
-                    f"Saved keyword match for this question: {feedback[index]}%"
+                    f"Saved score for this question: {feedback[index]}%"
                 )
 
                 if st.button(
@@ -4527,6 +4887,7 @@ elif page == "AI Mock Interview":
                 ):
                     st.session_state["mock_index_v1"] = index + 1
                     st.rerun()
+
 
 # =========================================================
 # SKILLFORGE CODE LAB
@@ -4569,7 +4930,7 @@ elif page == "SkillForge Code Lab":
 
     # Embedded online coding editor.
     # The editor runs on the external provider's website.
-    editor_url = "https://onecompiler.com/embed/?theme=dark"
+    editor_url ="https://onecompiler.com/embed/?theme=dark"
 
     
     st.iframe(
@@ -5033,6 +5394,197 @@ elif page == "AI Career Mentor":
             {"role": "assistant", "content": answer}
         )
 
+
+
+# =========================================================
+# AI CAREER AGENT: ADAPTIVE MISSIONS, EVIDENCE, TEXT AND VOICE
+# =========================================================
+
+elif page == "AI Career Agent":
+    st.header("🧭 SkillPath AI Career Agent")
+    st.write(
+        "A context-aware learning workflow that assigns practical missions, "
+        "checks evidence against a visible rubric, remembers mistakes, and "
+        "recommends the next step."
+    )
+    st.caption(
+        "Evidence checks are rubric-based and can be imperfect. They help "
+        "discourage copy-only submissions but cannot prove that copying never occurred."
+    )
+
+    user_id = st.session_state.user_id
+    profile = database.get_profile(user_id)
+    career_goal = database.get_career_goal(user_id)
+    assessment_history = database.get_assessment_history(user_id)
+    agent_summary = database.get_agent_summary(user_id)
+    student_context = career_agent.build_student_context(
+        profile, career_goal, assessment_history, agent_summary
+    )
+
+    overview_left, overview_mid, overview_right = st.columns(3)
+    overview_left.metric("Career goal", career_goal or "Not selected")
+    overview_mid.metric("Missions completed", agent_summary["missions_completed"])
+    overview_right.metric("Evidence records", len(agent_summary["evidence"]))
+
+    if not career_goal:
+        st.warning("Select a career goal first. You can still explore the agent, but missions will use general career skills until a goal is saved.")
+
+    st.divider()
+    st.subheader("🎯 Your practical mission")
+    mission = database.get_current_agent_mission(user_id)
+    if not mission:
+        st.write("The agent uses your career goal and past evidence to choose a suitable next task.")
+        if st.button("Assign my next mission", type="primary", key="assign_agent_mission"):
+            selected = career_agent.select_mission(career_goal, agent_summary)
+            database.create_agent_mission(
+                user_id,
+                career_goal or "General career readiness",
+                selected["skill"], selected["title"],
+                selected["instructions"], selected["rubric"]
+            )
+            st.rerun()
+    else:
+        st.markdown(f"**{mission['title']}** · Skill: **{mission['skill']}**")
+        st.write(mission["instructions"])
+        with st.expander("How this mission is checked"):
+            st.write("Your response is compared with these task requirements:")
+            st.write(", ".join(mission.get("rubric", [])))
+            st.caption("This is a transparent keyword-and-explanation check, not an execution sandbox or a guarantee against copied answers.")
+
+        if mission["status"] != "completed":
+            with st.form(f"agent_mission_form_{mission['id']}"):
+                submission = st.text_area(
+                    "Your solution and reasoning",
+                    height=220,
+                    placeholder="Write your own solution, example/test, and explain why it works...",
+                    key=f"agent_submission_{mission['id']}"
+                )
+                submitted = st.form_submit_button("Check my work", type="primary")
+            if submitted:
+                if len(submission.strip()) < 20:
+                    st.warning("Add a little more detail so the agent has evidence to review.")
+                else:
+                    latest_summary = database.get_agent_summary(user_id)
+                    result = career_agent.verify_submission(
+                        mission, submission, latest_summary["evidence"]
+                    )
+                    database.record_agent_attempt(
+                        user_id, mission["id"], mission["skill"], submission,
+                        result["score"], result["feedback"], result["level"]
+                    )
+                    st.session_state[f"agent_result_{mission['id']}"] = result
+                    st.rerun()
+        else:
+            st.success("This mission is already recorded as completed.")
+
+        result = st.session_state.get(f"agent_result_{mission['id']}")
+        if result:
+            st.subheader("Mission feedback")
+            st.metric("Rubric coverage", f"{result['score']}%")
+            st.write(f"**Evidence status:** {result['level']}")
+            st.write(result["feedback"])
+        if mission["status"] == "completed":
+            if st.button("Get an adaptive next mission", key=f"next_agent_mission_{mission['id']}"):
+                selected = career_agent.select_mission(career_goal, database.get_agent_summary(user_id))
+                database.create_agent_mission(
+                    user_id, career_goal or "General career readiness",
+                    selected["skill"], selected["title"],
+                    selected["instructions"], selected["rubric"]
+                )
+                st.rerun()
+
+    st.divider()
+    st.subheader("🪪 Skill Evidence Passport")
+    current_summary = database.get_agent_summary(user_id)
+    if current_summary["evidence"]:
+        st.write("Evidence is grouped by task results; it is not a formal certification.")
+        for evidence in current_summary["evidence"][:12]:
+            with st.expander(f"{evidence['skill']} · {evidence['evidence_level']} · {evidence['score']}%"):
+                st.write(evidence["notes"] or "No extra notes.")
+                st.caption(f"Source: {evidence['evidence_source']} · {evidence['created_at']}")
+    else:
+        st.info("No mission evidence yet. Complete a mission to start building this record.")
+
+    with st.expander("🧠 Mistake Memory and recent activity"):
+        if current_summary["events"]:
+            for event in current_summary["events"][:10]:
+                st.write(f"**{event['event_type'].replace('_', ' ').title()}** · {event['skill'] or 'General'} · {event['created_at']}")
+                if event["feedback"]:
+                    st.caption(event["feedback"])
+        else:
+            st.write("The agent will record task attempts and feedback here.")
+
+    st.divider()
+    st.subheader("💬 Ask your agent — text or voice")
+    input_mode = st.radio("Choose how to ask", ["Text", "Voice"], horizontal=True, key="career_agent_input_mode")
+    voice_question = ""
+    if input_mode == "Voice":
+        try:
+            from streamlit_mic_recorder import speech_to_text
+            voice_question = speech_to_text(
+                language="en",
+                start_prompt="🎙️ Start speaking",
+                stop_prompt="⏹️ Stop recording",
+                just_once=True,
+                use_container_width=True,
+                key="career_agent_voice_input"
+            ) or ""
+            if voice_question:
+                st.write("**Recognized speech:**", voice_question)
+                st.caption("Review the recognized text before sending it to the agent.")
+        except Exception:
+            st.warning("Voice input is unavailable in this environment. Use Text mode or check that streamlit-mic-recorder is installed.")
+
+    if input_mode == "Text":
+        agent_question = st.text_input("What do you need help with?", key="career_agent_text_question", placeholder="e.g. Help me improve Python problem solving")
+    else:
+        if voice_question and st.session_state.get("career_agent_voice_question") != voice_question:
+            st.session_state["career_agent_voice_question"] = voice_question
+        agent_question = st.text_input("Review or edit the recognized question", value=voice_question, key="career_agent_voice_question")
+
+    if st.button("Ask SkillPath Agent", type="primary", key="ask_career_agent"):
+        if not agent_question.strip():
+            st.warning("Type a question or record your voice first.")
+        else:
+            question = agent_question.strip()
+            database.save_agent_chat(user_id, "user", question)
+            recent_messages = database.get_agent_chat(user_id, 10)
+            conversation = "\n".join(f"{m['role']}: {m['message']}" for m in recent_messages)
+            system_prompt = (
+                "You are the SkillPath AI Career Agent for engineering students in India. "
+                "Use simple, supportive English and actionable next steps. Do not invent jobs, "
+                "do not claim a task is verified unless stored evidence supports it, and "
+                "distinguish self-reported skills from demonstrated evidence."
+            )
+            prompt = (
+                f"Student context: {student_context}\nRecent agent conversation: {conversation}\n"
+                f"Student question: {question}"
+            )
+            answer, provider_diagnostics = generate_skillpath_ai_answer(
+                prompt, system_prompt=system_prompt, max_tokens=700
+            )
+            if not answer:
+                answer = get_offline_career_guidance(question, career_goal)
+                st.warning("AI providers did not return an answer, so built-in guidance is shown as a fallback.")
+                with st.expander("AI connection diagnostics — use this to troubleshoot"):
+                    for diagnostic in provider_diagnostics:
+                        st.write(f"• {diagnostic}")
+            database.save_agent_chat(user_id, "assistant", answer)
+            st.markdown("### Agent response")
+            st.markdown(answer)
+            try:
+                from gtts import gTTS
+                from io import BytesIO
+                audio_buffer = BytesIO()
+                gTTS(text=answer[:4500], lang="en").write_to_fp(audio_buffer)
+                st.audio(audio_buffer.getvalue(), format="audio/mp3")
+                st.caption("Audio is generated from the same text answer. It requires an internet connection.")
+            except Exception:
+                st.caption("Text response is ready. Audio playback could not be generated in this environment.")
+
+    with st.expander("Recent conversation"):
+        for chat in database.get_agent_chat(user_id, 10):
+            st.markdown(f"**{'You' if chat['role'] == 'user' else 'Agent'}:** {chat['message']}")
 
 
 # =========================================================
